@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import yfinance as yf
 import plotly.express as px
 
 # --- Page Config ---
@@ -28,30 +29,47 @@ if page == "🏠 Home":
 # --- Portfolio Dashboard ---
 elif page == "📊 Portfolio Dashboard":
     st.title("📊 Portfolio Dashboard")
-    st.write("Track your portfolio performance in real-time.")
+    st.write("Track your portfolio performance in real-time with live market data.")
 
-    # --- Dummy Portfolio Data ---
-    data = {
-        "Stock": ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN"],
-        "Quantity": [50, 30, 20, 10, 15],
-        "Buy Price": [150, 280, 2500, 700, 3300],
-        "Current Price": [170, 300, 2700, 750, 3500]
+    # --- Define Portfolio ---
+    portfolio = {
+        "AAPL": 50,
+        "MSFT": 30,
+        "GOOGL": 20,
+        "TSLA": 10,
+        "AMZN": 15
     }
-    df = pd.DataFrame(data)
+
+    # --- Fetch Live Prices ---
+    stocks = list(portfolio.keys())
+    data = yf.download(stocks, period="1d")["Adj Close"].iloc[-1]
+
+    # --- Build DataFrame ---
+    df = pd.DataFrame({
+        "Stock": stocks,
+        "Quantity": [portfolio[s] for s in stocks],
+        "Current Price": [data[s] for s in stocks]
+    })
+    df["Buy Price"] = [150, 280, 2500, 700, 3300]  # example fixed buy prices
     df["Value"] = df["Quantity"] * df["Current Price"]
     df["Gain/Loss %"] = ((df["Current Price"] - df["Buy Price"]) / df["Buy Price"]) * 100
 
     # --- Display Table ---
-    st.subheader("Portfolio Holdings")
-    st.dataframe(df.style.format({"Buy Price": "${:,.2f}", "Current Price": "${:,.2f}", "Value": "${:,.2f}", "Gain/Loss %": "{:.2f}%"}))
+    st.subheader("Portfolio Holdings (Live)")
+    st.dataframe(df.style.format({
+        "Buy Price": "${:,.2f}",
+        "Current Price": "${:,.2f}",
+        "Value": "${:,.2f}",
+        "Gain/Loss %": "{:.2f}%"
+    }))
 
-    # --- Portfolio Performance Chart ---
-    st.subheader("Portfolio Performance (Dummy Trend)")
-    perf_data = pd.DataFrame({
-        "Date": pd.date_range(start="2024-05-01", periods=6, freq="M"),
-        "Portfolio Value": [25000, 26500, 27000, 29000, 31000, 33000]
-    })
-    line_chart = px.line(perf_data, x="Date", y="Portfolio Value", title="Portfolio Growth Over Time")
+    # --- Portfolio Value Over Time ---
+    st.subheader("Portfolio Performance (Last 3 Months)")
+    hist = yf.download(stocks, period="3mo")["Adj Close"]
+    portfolio_value = (hist * pd.Series(portfolio)).sum(axis=1).reset_index()
+    portfolio_value.columns = ["Date", "Portfolio Value"]
+
+    line_chart = px.line(portfolio_value, x="Date", y="Portfolio Value", title="Portfolio Growth Over Time")
     st.plotly_chart(line_chart, use_container_width=True)
 
     # --- Asset Allocation Pie Chart ---
